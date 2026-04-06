@@ -7,15 +7,18 @@ from PIL import Image
 import fitz  # PyMuPDF
 import os
 import uuid
+import base64  # needed for preview
 
 app = Flask(__name__)
 CORS(app)
 
 # --------------------
-# Folders
+# Folders (Render writable folder)
 # --------------------
-os.makedirs("uploads", exist_ok=True)
-os.makedirs("outputs", exist_ok=True)
+UPLOAD_FOLDER = "/tmp/uploads"
+OUTPUT_FOLDER = "/tmp/outputs"
+os.makedirs(UPLOAD_FOLDER, exist_ok=True)
+os.makedirs(OUTPUT_FOLDER, exist_ok=True)
 
 # --------------------
 # Convert PDF to Word
@@ -29,21 +32,25 @@ def convert_pdf_to_word():
     if not file.filename.endswith(".pdf"):
         return jsonify({"error": "Invalid file type"}), 400
 
-    pdf_path = os.path.join("uploads", file.filename)
+    pdf_path = os.path.join(UPLOAD_FOLDER, f"{uuid.uuid4()}_{file.filename}")
     file.save(pdf_path)
 
-    doc = Document()
-    reader = PdfReader(pdf_path)
-    for page in reader.pages:
-        text = page.extract_text()
-        if text:
-            doc.add_paragraph(text)
+    try:
+        doc = Document()
+        reader = PdfReader(pdf_path)
+        for page in reader.pages:
+            text = page.extract_text()
+            if text:
+                doc.add_paragraph(text)
 
-    output_filename = file.filename.replace(".pdf", ".docx")
-    output_path = os.path.join("outputs", output_filename)
-    doc.save(output_path)
+        output_filename = f"{uuid.uuid4()}.docx"
+        output_path = os.path.join(OUTPUT_FOLDER, output_filename)
+        doc.save(output_path)
 
-    return send_file(output_path, as_attachment=True)
+        return send_file(output_path, as_attachment=True)
+    finally:
+        if os.path.exists(pdf_path):
+            os.remove(pdf_path)
 
 # --------------------
 # Merge PDFs
@@ -60,7 +67,7 @@ def merge_pdfs():
 
     saved_paths = []
     for f in pdf_files:
-        path = os.path.join("uploads", f.filename)
+        path = os.path.join(UPLOAD_FOLDER, f"{uuid.uuid4()}_{f.filename}")
         f.save(path)
         saved_paths.append(path)
 
@@ -68,10 +75,14 @@ def merge_pdfs():
     for path in saved_paths:
         merger.append(path)
 
-    output_filename = "merged.pdf"
-    output_path = os.path.join("outputs", output_filename)
+    output_filename = f"merged_{uuid.uuid4().hex}.pdf"
+    output_path = os.path.join(OUTPUT_FOLDER, output_filename)
     merger.write(output_path)
     merger.close()
+
+    for path in saved_paths:
+        if os.path.exists(path):
+            os.remove(path)
 
     return send_file(output_path, as_attachment=True)
 
@@ -87,8 +98,7 @@ def resize_image():
     if not (file.filename.lower().endswith(".jpg") or file.filename.lower().endswith(".png")):
         return jsonify({"error": "Only JPG and PNG allowed"}), 400
 
-    filename = f"{uuid.uuid4()}_{file.filename}"
-    input_path = os.path.join("uploads", filename)
+    input_path = os.path.join(UPLOAD_FOLDER, f"{uuid.uuid4()}_{file.filename}")
     file.save(input_path)
 
     scale = float(request.form.get("scale", 100)) / 100
@@ -99,17 +109,12 @@ def resize_image():
         new_height = int(img.height * scale)
         resized_img = img.resize((new_width, new_height))
 
-        output_filename = f"resized_{uuid.uuid4().hex}.png"
-        output_path = os.path.join("outputs", output_filename)
+        output_path = os.path.join(OUTPUT_FOLDER, f"resized_{uuid.uuid4().hex}.png")
         resized_img.save(output_path)
-
-    except Exception as e:
-        return jsonify({"error": str(e)}), 500
+        return send_file(output_path, as_attachment=True)
     finally:
         if os.path.exists(input_path):
             os.remove(input_path)
-
-    return send_file(output_path, as_attachment=True)
 
 # --------------------
 # Preview PDF
@@ -134,7 +139,6 @@ def preview_pdf():
 
         pdf_doc.close()
         return jsonify({"pages": pages_base64})
-
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
