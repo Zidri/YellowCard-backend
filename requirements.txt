@@ -1,7 +1,7 @@
-Flask==2.3.3
-flask-cors==3.0.10
-PyPDF2==3.1.1
-python-docx==0.8.12
-Pillow==10.1.0
-PyMuPDF==1.27.2
-gunicorn==21.2.0
+flask
+flask-cors
+PyPDF2
+python-docx
+Pillow
+PyMuPDF
+gunicorn
