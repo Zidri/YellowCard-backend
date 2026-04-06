@@ -7,6 +7,7 @@ from PIL import Image
 import fitz  # PyMuPDF
 import os
 import uuid
+import base64  # <-- fixed missing import
 
 app = Flask(__name__)
 CORS(app)
@@ -29,7 +30,7 @@ def convert_pdf_to_word():
     if not file.filename.endswith(".pdf"):
         return jsonify({"error": "Invalid file type"}), 400
 
-    pdf_path = os.path.join("uploads", file.filename)
+    pdf_path = os.path.join("uploads", f"{uuid.uuid4().hex}_{file.filename}")  # unique filename
     file.save(pdf_path)
 
     doc = Document()
@@ -39,7 +40,7 @@ def convert_pdf_to_word():
         if text:
             doc.add_paragraph(text)
 
-    output_filename = file.filename.replace(".pdf", ".docx")
+    output_filename = f"{uuid.uuid4().hex}_converted.docx"
     output_path = os.path.join("outputs", output_filename)
     doc.save(output_path)
 
@@ -60,7 +61,7 @@ def merge_pdfs():
 
     saved_paths = []
     for f in pdf_files:
-        path = os.path.join("uploads", f.filename)
+        path = os.path.join("uploads", f"{uuid.uuid4().hex}_{f.filename}")
         f.save(path)
         saved_paths.append(path)
 
@@ -68,7 +69,7 @@ def merge_pdfs():
     for path in saved_paths:
         merger.append(path)
 
-    output_filename = "merged.pdf"
+    output_filename = f"{uuid.uuid4().hex}_merged.pdf"
     output_path = os.path.join("outputs", output_filename)
     merger.write(output_path)
     merger.close()
@@ -87,7 +88,7 @@ def resize_image():
     if not (file.filename.lower().endswith(".jpg") or file.filename.lower().endswith(".png")):
         return jsonify({"error": "Only JPG and PNG allowed"}), 400
 
-    filename = f"{uuid.uuid4()}_{file.filename}"
+    filename = f"{uuid.uuid4().hex}_{file.filename}"
     input_path = os.path.join("uploads", filename)
     file.save(input_path)
 
@@ -99,7 +100,7 @@ def resize_image():
         new_height = int(img.height * scale)
         resized_img = img.resize((new_width, new_height))
 
-        output_filename = f"resized_{uuid.uuid4().hex}.png"
+        output_filename = f"{uuid.uuid4().hex}_resized.png"
         output_path = os.path.join("outputs", output_filename)
         resized_img.save(output_path)
 
