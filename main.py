@@ -10,7 +10,7 @@ import uuid
 import base64
 
 app = Flask(__name__)
-CORS(app, origins=["https://yellow-card-five.vercel.app/"])  # allow requests from React dev server
+CORS(app, origins=["http://localhost:3000", "https://yellow-card-five.vercel.app"])  # allow requests from React dev server
 
 # -------------------- Folders --------------------
 os.makedirs("uploads", exist_ok=True)
