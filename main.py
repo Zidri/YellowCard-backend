@@ -7,28 +7,23 @@ from PIL import Image
 import fitz  # PyMuPDF
 import os
 import uuid
+import base64
 
 app = Flask(__name__)
-CORS(app)
+CORS(app)  # allow requests from React dev server
 
-# --------------------
-# Folders
-# --------------------
+# -------------------- Folders --------------------
 os.makedirs("uploads", exist_ok=True)
 os.makedirs("outputs", exist_ok=True)
 
-# --------------------
-# Convert PDF to Word
-# --------------------
+# -------------------- Convert PDF to Word --------------------
 @app.route("/convert", methods=["POST"])
 def convert_pdf_to_word():
     if "file" not in request.files:
         return jsonify({"error": "No file uploaded"}), 400
-
     file = request.files["file"]
     if not file.filename.endswith(".pdf"):
         return jsonify({"error": "Invalid file type"}), 400
-
     pdf_path = os.path.join("uploads", file.filename)
     file.save(pdf_path)
 
@@ -42,17 +37,13 @@ def convert_pdf_to_word():
     output_filename = file.filename.replace(".pdf", ".docx")
     output_path = os.path.join("outputs", output_filename)
     doc.save(output_path)
-
     return send_file(output_path, as_attachment=True)
 
-# --------------------
-# Merge PDFs
-# --------------------
+# -------------------- Merge PDFs --------------------
 @app.route("/merge", methods=["POST"])
 def merge_pdfs():
     if "files" not in request.files:
         return jsonify({"error": "No files uploaded"}), 400
-
     files = request.files.getlist("files")
     pdf_files = [f for f in files if f.filename.endswith(".pdf")]
     if not pdf_files:
@@ -68,21 +59,16 @@ def merge_pdfs():
     for path in saved_paths:
         merger.append(path)
 
-    output_filename = "merged.pdf"
-    output_path = os.path.join("outputs", output_filename)
+    output_path = os.path.join("outputs", "merged.pdf")
     merger.write(output_path)
     merger.close()
-
     return send_file(output_path, as_attachment=True)
 
-# --------------------
-# Resize Image
-# --------------------
+# -------------------- Resize Image --------------------
 @app.route("/resize", methods=["POST"])
 def resize_image():
     if "file" not in request.files:
         return jsonify({"error": "No file uploaded"}), 400
-
     file = request.files["file"]
     if not (file.filename.lower().endswith(".jpg") or file.filename.lower().endswith(".png")):
         return jsonify({"error": "Only JPG and PNG allowed"}), 400
@@ -90,7 +76,6 @@ def resize_image():
     filename = f"{uuid.uuid4()}_{file.filename}"
     input_path = os.path.join("uploads", filename)
     file.save(input_path)
-
     scale = float(request.form.get("scale", 100)) / 100
 
     try:
@@ -111,22 +96,19 @@ def resize_image():
 
     return send_file(output_path, as_attachment=True)
 
-# --------------------
-# Preview PDF
-# --------------------
+# -------------------- Preview PDF --------------------
 @app.route("/preview_pdf", methods=["POST"])
 def preview_pdf():
     if "file" not in request.files:
         return jsonify({"error": "No file uploaded"}), 400
-
     pdf_file = request.files["file"]
 
     try:
+        pdf_file.stream.seek(0)
         pdf_doc = fitz.open(stream=pdf_file.read(), filetype="pdf")
         pages_base64 = []
 
-        for page_number in range(len(pdf_doc)):
-            page = pdf_doc[page_number]
+        for page in pdf_doc:
             pix = page.get_pixmap(matrix=fitz.Matrix(2, 2))
             img_bytes = pix.tobytes("png")
             b64_str = base64.b64encode(img_bytes).decode("utf-8")
@@ -138,15 +120,12 @@ def preview_pdf():
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
-# --------------------
-# Edit PDF placeholder
-# --------------------
+# -------------------- Edit PDF (placeholder) --------------------
 @app.route("/edit_pdf", methods=["POST"])
 def edit_pdf():
     return jsonify({"message": "PDF editing endpoint"})
 
-# --------------------
-# Run app
-# --------------------
+# -------------------- Run app --------------------
 if __name__ == "__main__":
-    app.run(debug=True, port=5000)
+    # Use port 5003 for local dev if you want
+    app.run(port=5003, debug=True)
